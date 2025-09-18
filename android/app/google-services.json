@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "134091866630",
+    "project_id": "skylead-db6e9",
+    "storage_bucket": "skylead-db6e9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:134091866630:android:10c3b1c2a25fe89c0ff987",
+        "android_client_info": {
+          "package_name": "me.skyos.skylead"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBgf4hApKrosbJ8u8lPxtPcSVktIRbU5mI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
