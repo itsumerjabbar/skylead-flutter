@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -309,6 +310,10 @@ class DashboardScreenState extends State<DashboardScreen> {
       });
 
       if (action == 'accept') {
+        // Launch phone call immediately when accepting
+        if (callRequest.phone.isNotEmpty) {
+          await _launchPhoneCall(callRequest.phone);
+        }
         await _showSuccessModal(callRequest.name, callRequest.phone);
       } else {
         await _showDeclineModal(callRequest.name);
@@ -422,11 +427,6 @@ class DashboardScreenState extends State<DashboardScreen> {
         );
       },
     );
-
-    // Launch phone dialer
-    if (phoneNumber.isNotEmpty) {
-      await _launchPhoneCall(phoneNumber);
-    }
   }
 
   Future<void> _showDeclineModal(String callerName) async {
@@ -517,25 +517,45 @@ class DashboardScreenState extends State<DashboardScreen> {
       final Uri phoneUri = Uri(scheme: 'tel', path: cleanNumber);
 
       if (await canLaunchUrl(phoneUri)) {
-        await launchUrl(phoneUri, mode: LaunchMode.externalApplication);
+        await launchUrl(
+          phoneUri, 
+          mode: LaunchMode.externalApplication,
+          webOnlyWindowName: '_blank'
+        );
       } else {
         // Fallback: try with a different approach
         final String dialString = 'tel:$cleanNumber';
         final Uri fallbackUri = Uri.parse(dialString);
-        await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
+        await launchUrl(
+          fallbackUri, 
+          mode: LaunchMode.externalApplication,
+          webOnlyWindowName: '_blank'
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Phone: $phoneNumber\nTap to copy and dial manually'),
+            content: Text('Unable to launch phone dialer.\nPhone: $phoneNumber'),
             backgroundColor: Colors.orange,
             duration: const Duration(seconds: 4),
             action: SnackBarAction(
               label: 'Copy',
               textColor: Colors.white,
               onPressed: () {
-                // Copy to clipboard functionality could be added here
+                // Copy phone number to clipboard
+                try {
+                  Clipboard.setData(ClipboardData(text: phoneNumber));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Phone number copied to clipboard'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                } catch (e) {
+                  // Handle clipboard error silently
+                }
               },
             ),
           ),
