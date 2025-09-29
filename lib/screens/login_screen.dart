@@ -43,12 +43,12 @@ class LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      // Reset loading before navigation
+      // Reset loading - AuthWrapper will handle navigation
       setState(() {
         _isLoading = false;
       });
-
-      Navigator.of(context).pushReplacementNamed('/welcome');
+      
+      // AuthWrapper will automatically show welcome screen then main screen
     } catch (e) {
       if (!mounted) return;
       setState(() {

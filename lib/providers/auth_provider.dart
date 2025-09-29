@@ -53,10 +53,12 @@ class User {
 class AuthProvider with ChangeNotifier {
   User? _user;
   bool _isLoading = true;
+  bool _showWelcomeAfterLogin = false;
 
   User? get user => _user;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _user != null;
+  bool get shouldShowWelcome => _showWelcomeAfterLogin;
 
   AuthProvider() {
     _loadUserData();
@@ -82,6 +84,7 @@ class AuthProvider with ChangeNotifier {
     try {
       final userData = await ApiService.login(email, password);
       _user = User.fromJson(userData);
+      _showWelcomeAfterLogin = true; // Flag to show welcome screen
 
       // Clear all existing notifications after successful login
       try {
@@ -108,9 +111,15 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  void welcomeScreenShown() {
+    _showWelcomeAfterLogin = false;
+    notifyListeners();
+  }
+
   Future<void> logout() async {
     await ApiService.clearUserData();
     _user = null;
+    _showWelcomeAfterLogin = false; // Reset welcome flag on logout
     notifyListeners();
   }
 

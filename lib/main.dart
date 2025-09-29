@@ -65,7 +65,10 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        if (auth.isAuthenticated) {
+        if (auth.isAuthenticated && auth.shouldShowWelcome) {
+          // Show welcome screen after login, then go to main screen
+          return WelcomeScreen();
+        } else if (auth.isAuthenticated) {
           return MainScreen();
         } else {
           return LoginScreen();

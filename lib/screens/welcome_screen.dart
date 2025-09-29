@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -125,10 +127,11 @@ class WelcomeScreenState extends State<WelcomeScreen>
       }
     });
 
-    // Navigate to main screen after 3.5 seconds
+    // Notify AuthProvider that welcome screen has been shown
     Future.delayed(const Duration(milliseconds: 3500), () {
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/main');
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        authProvider.welcomeScreenShown();
       }
     });
   }
