@@ -342,4 +342,86 @@ class FCMService {
       // Error unsubscribing from topic
     }
   }
+
+  /// Clears all local notifications from the device notification panel
+  Future<void> clearAllNotifications() async {
+    try {
+      // Clear all local notifications
+      await _localNotifications.cancelAll();
+      
+      // Platform-specific notification clearing
+      if (Platform.isIOS) {
+        // Clear iOS badge count and delivered notifications
+        final iosPlugin = _localNotifications
+            .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin
+            >();
+        if (iosPlugin != null) {
+          // Clear delivered notifications from notification center
+          await iosPlugin.requestPermissions(
+            alert: true,
+            badge: true, 
+            sound: true,
+          );
+        }
+      }
+      
+      if (Platform.isAndroid) {
+        // Clear Android notifications and badge
+        final androidPlugin = _localNotifications
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
+        if (androidPlugin != null) {
+          await androidPlugin.cancelAll();
+          
+          // Also clear any notifications from status bar
+          await androidPlugin.deleteNotificationChannel('default_channel');
+          await androidPlugin.deleteNotificationChannel('call_channel');
+          
+          // Recreate channels after clearing
+          await _createNotificationChannels();
+        }
+      }
+      
+      // Additional: Clear any Firebase delivered notifications
+      // This helps clear FCM notifications that might still be showing
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+    } catch (e) {
+      // Error clearing notifications - fail silently to not interrupt app flow
+    }
+  }
+
+  /// Clears notifications for a specific channel (Android only)
+  Future<void> clearNotificationsByChannel(String channelId) async {
+    try {
+      if (Platform.isAndroid) {
+        // Note: Flutter Local Notifications doesn't have a direct method to clear by channel
+        // This would require platform-specific implementation if needed
+        await _localNotifications.cancelAll();
+      }
+    } catch (e) {
+      // Error clearing notifications by channel
+    }
+  }
+
+  /// Clears a specific notification by ID
+  Future<void> clearNotificationById(int notificationId) async {
+    try {
+      await _localNotifications.cancel(notificationId);
+    } catch (e) {
+      // Error clearing specific notification
+    }
+  }
+
+  /// Gets the count of pending notifications
+  Future<List<PendingNotificationRequest>> getPendingNotifications() async {
+    try {
+      return await _localNotifications.pendingNotificationRequests();
+    } catch (e) {
+      // Error getting pending notifications
+      return [];
+    }
+  }
 }

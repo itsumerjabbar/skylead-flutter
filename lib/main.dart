@@ -19,6 +19,9 @@ void main() async {
       // Handle notification data here if needed
     },
   );
+  
+  // Clear all notifications when app starts fresh
+  await fcmService.clearAllNotifications();
 
   runApp(const MyApp());
 }

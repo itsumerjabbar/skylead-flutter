@@ -138,6 +138,8 @@ class DashboardScreenState extends State<DashboardScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _setupFCMHandler();
+    // Clear all notifications when app opens
+    _clearNotifications();
     // Delay the API call slightly to ensure the widget is fully mounted
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadPendingCalls();
@@ -153,9 +155,24 @@ class DashboardScreenState extends State<DashboardScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    // Refresh data when app comes to foreground
+    // Clear notifications and refresh data when app comes to foreground
     if (state == AppLifecycleState.resumed && mounted) {
+      _clearNotifications(); // Clear notifications when app resumes
       _loadPendingCalls();
+    }
+    // Also clear notifications when app becomes inactive (iOS) or paused (Android) 
+    // and then becomes active again
+    if (state == AppLifecycleState.inactive && mounted) {
+      _clearNotifications(); // Clear notifications when app becomes active
+    }
+  }
+
+  /// Clear all notifications when the user opens the app
+  Future<void> _clearNotifications() async {
+    try {
+      await FCMService().clearAllNotifications();
+    } catch (e) {
+      // Silently handle any errors in clearing notifications
     }
   }
 

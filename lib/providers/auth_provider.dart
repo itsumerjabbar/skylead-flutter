@@ -83,6 +83,13 @@ class AuthProvider with ChangeNotifier {
       final userData = await ApiService.login(email, password);
       _user = User.fromJson(userData);
 
+      // Clear all existing notifications after successful login
+      try {
+        await FCMService().clearAllNotifications();
+      } catch (e) {
+        // Notification clearing failed, but don't fail login
+      }
+
       // Register FCM after successful login
       try {
         await FCMService().registerForPushNotifications();
