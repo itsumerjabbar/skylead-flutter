@@ -125,7 +125,8 @@ class DashboardScreen extends StatefulWidget {
   DashboardScreenState createState() => DashboardScreenState();
 }
 
-class DashboardScreenState extends State<DashboardScreen> {
+class DashboardScreenState extends State<DashboardScreen> 
+    with WidgetsBindingObserver {
   List<CallRequest> _callRequests = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -135,8 +136,27 @@ class DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadPendingCalls();
+    WidgetsBinding.instance.addObserver(this);
     _setupFCMHandler();
+    // Delay the API call slightly to ensure the widget is fully mounted
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadPendingCalls();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Refresh data when app comes to foreground
+    if (state == AppLifecycleState.resumed && mounted) {
+      _loadPendingCalls();
+    }
   }
 
   void _setupFCMHandler() {
@@ -146,22 +166,40 @@ class DashboardScreenState extends State<DashboardScreen> {
 
   void _handleFCMNotification(Map<String, dynamic> data) {
     // FCM Call notification received
-
     // Check if this is a call notification
     if (data.containsKey('call_id') || data.containsKey('lead_id')) {
       // Refresh the call list to get real-time updates
-      _loadPendingCalls();
+      if (mounted) {
+        _loadPendingCalls();
+      }
     }
   }
 
   Future<void> _loadPendingCalls() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
+      // Check if user is logged in first
+      final userData = await ApiService.getUserData();
+      if (userData == null) {
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed('/login');
+        }
+        return;
+      }
+      
+      // Add a small delay for iOS compatibility
+      await Future.delayed(const Duration(milliseconds: 100));
+      
       final response = await ApiService.get('/getPendingCalls');
+      
+      if (!mounted) return;
+      
       if (response['data'] != null &&
           response['data']['pending_calls'] != null) {
         final calls = (response['data']['pending_calls'] as List)
@@ -170,18 +208,39 @@ class DashboardScreenState extends State<DashboardScreen> {
               (call) => call.status == 'pending',
             ) // Only show pending calls
             .toList();
+        
         setState(() {
           _callRequests = calls;
         });
+      } else {
+        setState(() {
+          _callRequests = [];
+        });
       }
     } catch (e) {
+      if (!mounted) return;
+      
+      final errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _handleSessionError(errorMessage);
+      
       setState(() {
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _errorMessage = errorMessage;
       });
+      
+      // Retry after 2 seconds if it's a network error and not a session error
+      if (!errorMessage.contains('Session') && mounted) {
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            _loadPendingCalls();
+          }
+        });
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -217,7 +276,7 @@ class DashboardScreenState extends State<DashboardScreen> {
               hour = hour % 12;
               if (hour == 0) hour = 12;
 
-              return '${hour}:${minute.toString().padLeft(2, '0')} $period';
+              return '$hour:${minute.toString().padLeft(2, '0')} $period';
             }
           }
         } catch (e) {
@@ -243,7 +302,7 @@ class DashboardScreenState extends State<DashboardScreen> {
           hour = hour % 12;
           if (hour == 0) hour = 12;
 
-          return '${hour}:${minute.toString().padLeft(2, '0')} $period';
+          return '$hour:${minute.toString().padLeft(2, '0')} $period';
         } catch (e) {
           // If parsing fails, return original string
           return timeString;
@@ -254,6 +313,30 @@ class DashboardScreenState extends State<DashboardScreen> {
       return timeString;
     } catch (e) {
       return timeString;
+    }
+  }
+
+  void _handleSessionError(String errorMessage) {
+    // Check if it's a session-related error
+    if (errorMessage.contains('Session has been ended') || 
+        errorMessage.contains('Session expired')) {
+      // Show message and redirect to login
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        
+        // Navigate to login after a short delay
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            Navigator.of(context).pushReplacementNamed('/login');
+          }
+        });
+      }
     }
   }
 
@@ -324,10 +407,13 @@ class DashboardScreenState extends State<DashboardScreen> {
         _callRequests.removeWhere((call) => call.id == callId);
       });
     } catch (e) {
+      final errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _handleSessionError(errorMessage);
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to $action call: $e'),
+            content: Text('Failed to $action call: $errorMessage'),
             backgroundColor: Colors.red,
           ),
         );
@@ -671,10 +757,6 @@ class DashboardScreenState extends State<DashboardScreen> {
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: const Color(0xFF4ADE80).withValues(alpha: 0.3),
-                  width: 1,
-                ),
               ),
               child: Column(
                 children: [
@@ -698,11 +780,12 @@ class DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
 
             // Connection Status
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(
                 children: [
                   Container(
@@ -722,10 +805,21 @@ class DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
 
-            // Incoming Requests Section Title
-            const SizedBox(height: 16),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              child: const Text(
+                'Pending Calls',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 8),
 
             // Calls List
             Expanded(
@@ -735,7 +829,10 @@ class DashboardScreenState extends State<DashboardScreen> {
                   color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: _isLoading
+                child: RefreshIndicator(
+                  onRefresh: _loadPendingCalls,
+                  color: const Color(0xFF4ADE80),
+                  child: _isLoading
                     ? const Center(
                         child: CircularProgressIndicator(
                           valueColor: AlwaysStoppedAnimation<Color>(
@@ -772,7 +869,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                               color: Colors.white.withValues(alpha: 0.3),
                             ),
                             const SizedBox(height: 16),
-                            Container(
+                            SizedBox(
                               width: MediaQuery.of(context).size.width * 0.7,
                               child: const Text(
                                 'No pending calls',
@@ -785,7 +882,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            Container(
+                            SizedBox(
                               width: MediaQuery.of(context).size.width * 0.7,
                               child: const Text(
                                 'All caught up! New call requests will appear here.',
@@ -807,6 +904,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                           return _buildCallCard(call);
                         },
                       ),
+                ),
               ),
             ),
           ],
@@ -827,13 +925,6 @@ class DashboardScreenState extends State<DashboardScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -872,11 +963,11 @@ class DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    if (call.phone.isNotEmpty)
-                      Text(
-                        call.phone,
-                        style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                      ),
+                    // if (call.phone.isNotEmpty)
+                    //   Text(
+                    //     call.phone,
+                    //     style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                    //   ),
                   ],
                 ),
               ),

@@ -55,30 +55,47 @@ class ApiService {
     }
 
     http.Response response;
-    if (method == 'GET') {
-      response = await http.get(url, headers: headers);
-    } else if (method == 'POST') {
-      response = await http.post(
-        url,
-        headers: headers,
-        body: body != null ? jsonEncode(body) : null,
-      );
-    } else if (method == 'PUT') {
-      response = await http.put(
-        url,
-        headers: headers,
-        body: body != null ? jsonEncode(body) : null,
-      );
-    } else if (method == 'DELETE') {
-      response = await http.delete(url, headers: headers);
-    } else {
-      throw Exception('Unsupported HTTP method: $method');
+    
+    // Add timeout for better iOS compatibility
+    const Duration timeout = Duration(seconds: 30);
+    
+    try {
+      if (method == 'GET') {
+        response = await http.get(url, headers: headers).timeout(timeout);
+      } else if (method == 'POST') {
+        response = await http.post(
+          url,
+          headers: headers,
+          body: body != null ? jsonEncode(body) : null,
+        ).timeout(timeout);
+      } else if (method == 'PUT') {
+        response = await http.put(
+          url,
+          headers: headers,
+          body: body != null ? jsonEncode(body) : null,
+        ).timeout(timeout);
+      } else if (method == 'DELETE') {
+        response = await http.delete(url, headers: headers).timeout(timeout);
+      } else {
+        throw Exception('Unsupported HTTP method: $method');
+      }
+    } catch (e) {
+      if (e.toString().contains('timeout')) {
+        throw Exception('Request timeout. Please check your internet connection.');
+      }
+      rethrow;
     }
 
     if (response.statusCode == 401) {
       // Token expired, clear data
       await clearUserData();
       throw Exception('Session expired. Please login again.');
+    }
+
+    if (response.statusCode == 403) {
+      // Forbidden access, session ended
+      await clearUserData();
+      throw Exception('Session has been ended. Please login again.');
     }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {

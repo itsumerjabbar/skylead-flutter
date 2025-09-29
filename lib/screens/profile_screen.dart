@@ -104,9 +104,9 @@ class ProfileScreen extends StatelessWidget {
 
                       // User Details
                       if (user != null) ...[
-                        _buildInfoCard('Role', user.roles.isNotEmpty 
+                        _buildInfoCard('Role', _cleanRoleName(user.roles.isNotEmpty 
                             ? (user.roles[0]['name'] ?? user.role) 
-                            : user.role),
+                            : user.role)),
                         const SizedBox(height: 12),
                         _buildInfoCard('Position', user.position),
                         const SizedBox(height: 12),
@@ -175,6 +175,11 @@ class ProfileScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _cleanRoleName(String role) {
+    // Remove number prefix pattern like "2_", "1_", etc.
+    return role.replaceAll(RegExp(r'^\d+_'), '');
   }
 
   Widget _buildInfoCard(String label, String value) {

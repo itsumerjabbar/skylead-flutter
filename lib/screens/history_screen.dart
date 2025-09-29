@@ -112,82 +112,47 @@ class HistoryScreenState extends State<HistoryScreen> {
           _updateFilteredHistory();
           _updateStats();
         });
-      } else {
-        // Mock data for testing
+      } 
+    } catch (e) {
+      final errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _handleSessionError(errorMessage);
+      
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, "/login");
         setState(() {
-          _callHistory = [
-            CallHistoryItem(
-              id: '67266',
-              name: 'Najwa Al Awadhi',
-              phone: '+971508838828',
-              status: 'accepted',
-              duration: '2:45',
-              time: 'Today, 9:52 PM',
-              date: 'Today',
-              initials: 'NA',
-              leadId: '67266',
-              agentName: 'EL',
-              leadName: 'AR-RETAILS-FB-UAE-TE-EL-SEP',
-              callTime: 'Today, 9:52 PM',
-            ),
-            CallHistoryItem(
-              id: '67268',
-              name: 'Sarah Johnson',
-              phone: '+971509876543',
-              status: 'rejected',
-              duration: '-',
-              time: 'Yesterday, 7:15 PM',
-              date: 'Yesterday',
-              initials: 'SJ',
-              leadId: '67268',
-              agentName: 'RK',
-              leadName: 'US-TECH-LEAD-SJ',
-              callTime: 'Yesterday, 7:15 PM',
-            ),
-            CallHistoryItem(
-              id: '67269',
-              name: 'Ahmed Hassan',
-              phone: '+971501234567',
-              status: 'accepted',
-              duration: '1:23',
-              time: 'Today, 12:53 PM',
-              date: 'Today',
-              initials: 'AH',
-              leadId: '67269',
-              agentName: 'MK',
-              leadName: 'UAE-REAL-ESTATE-AH',
-              callTime: 'Today, 12:53 PM',
-            ),
-            CallHistoryItem(
-              id: '67271',
-              name: 'Mohamed Ali',
-              phone: '+971502345678',
-              status: 'rejected',
-              duration: '-',
-              time: 'Yesterday, 3:45 PM',
-              date: 'Yesterday',
-              initials: 'MA',
-              leadId: '67271',
-              agentName: 'JD',
-              leadName: 'SHARJAH-RETAIL-MA',
-              callTime: 'Yesterday, 3:45 PM',
-            ),
-          ];
+          _callHistory = [];
           _updateFilteredHistory();
           _updateStats();
         });
       }
-    } catch (e) {
-      Navigator.pushReplacementNamed(context, "/login");
-      setState(() {
-        _callHistory = [];
-        _updateFilteredHistory();
-        _updateStats();
-      });
     } finally {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  void _handleSessionError(String errorMessage) {
+    // Check if it's a session-related error
+    if (errorMessage.contains('Session has been ended') || 
+        errorMessage.contains('Session expired')) {
+      // Show message and redirect to login
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        
+        // Navigate to login after a short delay
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            Navigator.of(context).pushReplacementNamed('/login');
+          }
+        });
+      }
     }
   }
 
@@ -204,8 +169,8 @@ class HistoryScreenState extends State<HistoryScreen> {
       filtered = filtered
           .where(
             (call) =>
-                call.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                call.phone.contains(_searchQuery),
+                call.name.toLowerCase().contains(_searchQuery.toLowerCase())
+                //|| call.phone.contains(_searchQuery),
           )
           .toList();
     }
@@ -469,7 +434,7 @@ class HistoryScreenState extends State<HistoryScreen> {
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: TextField(
@@ -482,10 +447,10 @@ class HistoryScreenState extends State<HistoryScreen> {
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   hintText: 'Search calls...',
-                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
                   prefixIcon: Icon(
                     Icons.search,
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                   ),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.all(16),
@@ -498,37 +463,11 @@ class HistoryScreenState extends State<HistoryScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  _buildFilterTab('All', 'all'),
+                  _buildFilterTab('All (${_stats['total']})', 'all'),
                   const SizedBox(width: 12),
-                  _buildFilterTab('Accepted', 'accepted'),
+                  _buildFilterTab('Accepted (${_stats['accepted']})', 'accepted'),
                   const SizedBox(width: 12),
-                  _buildFilterTab('Rejected', 'rejected'),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Stats Cards
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  _buildStatCard(
-                    '${_stats['total']}',
-                    'Total Calls',
-                    const Color(0xFF4ADE80),
-                  ),
-                  const SizedBox(width: 12),
-                  _buildStatCard(
-                    '${_stats['accepted']}',
-                    'Accepted',
-                    const Color(0xFF4ADE80),
-                  ),
-                  const SizedBox(width: 12),
-                  _buildStatCard(
-                    '${_stats['rejected']}',
-                    'Rejected',
-                    const Color(0xFFEF4444),
-                  ),
+                  _buildFilterTab('Rejected (${_stats['rejected']})', 'rejected'),
                 ],
               ),
             ),
@@ -538,7 +477,7 @@ class HistoryScreenState extends State<HistoryScreen> {
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: _isLoading
@@ -578,7 +517,7 @@ class HistoryScreenState extends State<HistoryScreen> {
                             Icon(
                               Icons.call,
                               size: 64,
-                              color: Colors.white.withOpacity(0.3),
+                              color: Colors.white.withValues(alpha: 0.3),
                             ),
                             const SizedBox(height: 16),
                             const Text(
@@ -594,7 +533,7 @@ class HistoryScreenState extends State<HistoryScreen> {
                               'Your call history will appear here once you start receiving calls.',
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.7),
+                                color: Colors.white.withValues(alpha: 0.7),
                                 fontSize: 14,
                               ),
                             ),
@@ -635,14 +574,14 @@ class HistoryScreenState extends State<HistoryScreen> {
           decoration: BoxDecoration(
             color: isActive
                 ? const Color(0xFF4ADE80)
-                : Colors.white.withOpacity(0.1),
+                : Colors.white.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Center(
             child: Text(
               title,
               style: TextStyle(
-                color: isActive ? Colors.white : Colors.white.withOpacity(0.7),
+                color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.7),
                 fontSize: 14,
                 fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
               ),
@@ -653,34 +592,6 @@ class HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _buildStatCard(String count, String label, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Text(
-              count,
-              style: TextStyle(
-                color: color,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildCallItem(CallHistoryItem call) {
     return GestureDetector(
@@ -693,7 +604,7 @@ class HistoryScreenState extends State<HistoryScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -736,14 +647,14 @@ class HistoryScreenState extends State<HistoryScreen> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      if (call.phone.isNotEmpty)
-                        Text(
-                          call.phone,
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 14,
-                          ),
-                        ),
+                      // if (call.phone.isNotEmpty)
+                      //   Text(
+                      //     call.phone,
+                      //     style: TextStyle(
+                      //       color: Colors.grey[600],
+                      //       fontSize: 14,
+                      //     ),
+                      //   ),
                     ],
                   ),
                 ),
@@ -801,7 +712,7 @@ class HistoryScreenState extends State<HistoryScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            Container(
+            SizedBox(
               width: double.infinity,
               child: Row(
                 children: [
@@ -854,7 +765,7 @@ class HistoryScreenState extends State<HistoryScreen> {
           hour = hour % 12;
           if (hour == 0) hour = 12;
 
-          return '${hour}:${minute.toString().padLeft(2, '0')} $period';
+          return '$hour:${minute.toString().padLeft(2, '0')} $period';
         } catch (e) {
           // If parsing fails, return original string
           return timeString;

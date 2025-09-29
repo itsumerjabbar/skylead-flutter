@@ -242,7 +242,7 @@ class FCMService {
   Future<String?> getFCMToken() async {
     try {
       final token = await _firebaseMessaging.getToken();
-      log("Token is ${token}");
+      log("Token is $token");
       // FCM Token retrieved
 
       // Store token locally
@@ -260,7 +260,7 @@ class FCMService {
   Future<void> registerForPushNotifications() async {
     try {
       final token = await getFCMToken();
-      log("FCM Token is ${token}");
+      log("FCM Token is $token");
       if (token == null) {
         // Failed to get FCM token
         return;
