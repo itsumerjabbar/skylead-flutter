@@ -824,20 +824,6 @@ class DashboardScreenState extends State<DashboardScreen>
 
             const SizedBox(height: 12),
 
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              child: const Text(
-                'Pending Calls',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
             // Calls List
             Expanded(
               child: Container(
