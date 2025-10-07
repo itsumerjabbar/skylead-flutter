@@ -54,9 +54,10 @@ class AuthProvider with ChangeNotifier {
   User? _user;
   bool _isLoading = true;
   bool _showWelcomeAfterLogin = false;
+  bool _isLoggingIn = false;
 
   User? get user => _user;
-  bool get isLoading => _isLoading;
+  bool get isLoading => _isLoading && !_isLoggingIn;
   bool get isAuthenticated => _user != null;
   bool get shouldShowWelcome => _showWelcomeAfterLogin;
 
@@ -78,6 +79,7 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> login(String email, String password) async {
+    _isLoggingIn = true;
     _isLoading = true;
     notifyListeners();
 
@@ -85,6 +87,8 @@ class AuthProvider with ChangeNotifier {
       final userData = await ApiService.login(email, password);
       _user = User.fromJson(userData);
       _showWelcomeAfterLogin = true; // Flag to show welcome screen
+      _isLoading = false; // Stop loading immediately after login success
+      _isLoggingIn = false;
 
       // Clear all existing notifications after successful login
       try {
@@ -102,10 +106,10 @@ class AuthProvider with ChangeNotifier {
         // Error handling can be added here if needed
       }
 
-      _isLoading = false;
       notifyListeners();
     } catch (e) {
       _isLoading = false;
+      _isLoggingIn = false;
       notifyListeners();
       rethrow;
     }
@@ -120,6 +124,7 @@ class AuthProvider with ChangeNotifier {
     await ApiService.clearUserData();
     _user = null;
     _showWelcomeAfterLogin = false; // Reset welcome flag on logout
+    _isLoggingIn = false; // Reset login flag on logout
     notifyListeners();
   }
 
