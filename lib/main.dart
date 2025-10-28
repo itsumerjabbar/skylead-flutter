@@ -59,20 +59,45 @@ class AuthWrapper extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
+        print('🔄 AuthWrapper rebuild - isLoading: ${auth.isLoading}, isAuthenticated: ${auth.isAuthenticated}, shouldShowWelcome: ${auth.shouldShowWelcome}');
+        
+        // Show loading screen during initial load
         if (auth.isLoading) {
+          print('⏳ Showing loading screen');
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            backgroundColor: Color(0xFF1B5E5A),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2ECC71)),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Loading...',
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ],
+              ),
+            ),
           );
         }
 
-        if (auth.isAuthenticated && auth.shouldShowWelcome) {
-          // Show welcome screen after login, then go to main screen
-          return WelcomeScreen();
-        } else if (auth.isAuthenticated) {
-          return MainScreen();
-        } else {
-          return LoginScreen();
+        // Handle authenticated states
+        if (auth.isAuthenticated) {
+          if (auth.shouldShowWelcome) {
+            print('👋 Showing welcome screen');
+            return WelcomeScreen();
+          } else {
+            print('🏠 Showing main screen');
+            return MainScreen();
+          }
         }
+
+        // Show login screen for unauthenticated users
+        print('🔐 Showing login screen');
+        return LoginScreen();
       },
     );
   }

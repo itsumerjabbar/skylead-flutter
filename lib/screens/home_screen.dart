@@ -129,6 +129,7 @@ class DashboardScreenState extends State<DashboardScreen>
     with WidgetsBindingObserver {
   List<CallRequest> _callRequests = [];
   bool _isLoading = true;
+  bool _isRefreshing = false; // Separate state for pull-to-refresh
   String? _errorMessage;
   String? _processingCallId;
   String? _processingAction; // 'accept' or 'reject'
@@ -193,11 +194,25 @@ class DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _loadPendingCalls() async {
+    await _loadPendingCallsInternal(false);
+  }
+
+  Future<void> _refreshPendingCalls() async {
+    HapticFeedback.lightImpact(); // Provide haptic feedback
+    await _loadPendingCallsInternal(true);
+  }
+
+  Future<void> _loadPendingCallsInternal(bool isRefresh) async {
     if (!mounted) return;
     
     setState(() {
-      _isLoading = true;
-      _errorMessage = null;
+      if (isRefresh) {
+        _isRefreshing = true;
+        _errorMessage = null; // Clear errors on refresh
+      } else {
+        _isLoading = true;
+        _errorMessage = null;
+      }
     });
 
     try {
@@ -238,15 +253,20 @@ class DashboardScreenState extends State<DashboardScreen>
       if (!mounted) return;
       
       final errorMessage = e.toString().replaceFirst('Exception: ', '');
+      final userFriendlyMessage = ApiService.getUserFriendlyErrorMessage(errorMessage);
+      
       _handleSessionError(errorMessage);
       
       setState(() {
-        _errorMessage = errorMessage;
+        _errorMessage = userFriendlyMessage;
       });
       
-      // Retry after 2 seconds if it's a network error and not a session error
-      if (!errorMessage.contains('Session') && mounted) {
-        Future.delayed(const Duration(seconds: 2), () {
+      // Don't auto-retry for network errors - let user manually retry
+      // Only auto-retry for non-network, non-session errors
+      if (!ApiService.isNetworkError(errorMessage) && 
+          !errorMessage.contains('Session') && 
+          mounted) {
+        Future.delayed(const Duration(seconds: 3), () {
           if (mounted) {
             _loadPendingCalls();
           }
@@ -256,6 +276,7 @@ class DashboardScreenState extends State<DashboardScreen>
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _isRefreshing = false;
         });
       }
     }
@@ -425,13 +446,24 @@ class DashboardScreenState extends State<DashboardScreen>
       });
     } catch (e) {
       final errorMessage = e.toString().replaceFirst('Exception: ', '');
+      final userFriendlyMessage = ApiService.getUserFriendlyErrorMessage(errorMessage);
+      
       _handleSessionError(errorMessage);
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to $action call: $errorMessage'),
+            content: Text(ApiService.isNetworkError(errorMessage) 
+                ? 'No internet connection. Please check your network and try again.' 
+                : 'Failed to $action call: $userFriendlyMessage'),
             backgroundColor: Colors.red,
+            action: ApiService.isNetworkError(errorMessage) 
+                ? SnackBarAction(
+                    label: 'Retry',
+                    textColor: Colors.white,
+                    onPressed: () => _handleCallAction(callId, action),
+                  )
+                : null,
           ),
         );
       }
@@ -833,9 +865,11 @@ class DashboardScreenState extends State<DashboardScreen>
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: RefreshIndicator(
-                  onRefresh: _loadPendingCalls,
+                  onRefresh: _refreshPendingCalls,
                   color: const Color(0xFF4ADE80),
-                  child: _isLoading
+                  backgroundColor: Colors.white,
+                  strokeWidth: 2.5,
+                  child: _isLoading && !_isRefreshing
                     ? const Center(
                         child: CircularProgressIndicator(
                           valueColor: AlwaysStoppedAnimation<Color>(
@@ -845,20 +879,44 @@ class DashboardScreenState extends State<DashboardScreen>
                       )
                     : _errorMessage != null
                     ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              _errorMessage!,
-                              style: const TextStyle(color: Colors.white),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _loadPendingCalls,
-                              child: const Text('Retry'),
-                            ),
-                          ],
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                ApiService.isNetworkError(_errorMessage!) 
+                                    ? Icons.wifi_off_rounded 
+                                    : Icons.error_outline_rounded,
+                                color: Colors.white.withValues(alpha: 0.7),
+                                size: 48,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _errorMessage!,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  height: 1.4,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 24),
+                              ElevatedButton.icon(
+                                onPressed: _loadPendingCalls,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Retry'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF4ADE80),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24, 
+                                    vertical: 12
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       )
                     : _callRequests.isEmpty

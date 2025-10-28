@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/fcm_service.dart';
@@ -54,10 +56,9 @@ class AuthProvider with ChangeNotifier {
   User? _user;
   bool _isLoading = true;
   bool _showWelcomeAfterLogin = false;
-  bool _isLoggingIn = false;
 
   User? get user => _user;
-  bool get isLoading => _isLoading && !_isLoggingIn;
+  bool get isLoading => _isLoading;
   bool get isAuthenticated => _user != null;
   bool get shouldShowWelcome => _showWelcomeAfterLogin;
 
@@ -79,39 +80,54 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> login(String email, String password) async {
-    _isLoggingIn = true;
-    _isLoading = true;
-    notifyListeners();
-
+    print('🔑 Starting login process...');
+    
     try {
+      print('📡 Making API call...');
       final userData = await ApiService.login(email, password);
+      print('✅ Login API successful: ${userData['name']}');
+          
       _user = User.fromJson(userData);
-      _showWelcomeAfterLogin = true; // Flag to show welcome screen
-      _isLoading = false; // Stop loading immediately after login success
-      _isLoggingIn = false;
-
-      // Clear all existing notifications after successful login
-      try {
-        await FCMService().clearAllNotifications();
-      } catch (e) {
-        // Notification clearing failed, but don't fail login
-      }
-
-      // Register FCM after successful login
-      try {
-        await FCMService().registerForPushNotifications();
-        // FCM registered successfully
-      } catch (e) {
-        // FCM registration failed, but don't fail login
-        // Error handling can be added here if needed
-      }
-
+      _showWelcomeAfterLogin = true;
+      
+      print('🎉 User set: ${_user!.name}');
+      print('🎉 shouldShowWelcome: $_showWelcomeAfterLogin');
+      print('🎉 isAuthenticated: $isAuthenticated');
+      print('📢 Calling notifyListeners...');
+      
+      // Force a rebuild of all listening widgets
       notifyListeners();
+      
+      // Add a slight delay and notify again to ensure UI updates
+      Future.delayed(Duration(milliseconds: 100), () {
+        print('🔄 Secondary notifyListeners call');
+        notifyListeners();
+      });
+      
+      print('✅ notifyListeners completed');
+      
+      // Background tasks - don't await these
+      _performBackgroundTasks();
+      
     } catch (e) {
-      _isLoading = false;
-      _isLoggingIn = false;
-      notifyListeners();
+      print('❌ Login failed: $e');
       rethrow;
+    }
+  }
+
+  Future<void> _performBackgroundTasks() async {
+    // Clear all existing notifications after successful login
+    try {
+      await FCMService().clearAllNotifications();
+    } catch (e) {
+      print('⚠️ FCM clear failed (non-critical): $e');
+    }
+
+    // Register FCM after successful login
+    try {
+      await FCMService().registerForPushNotifications();
+    } catch (e) {
+      print('⚠️ FCM registration failed (non-critical): $e');
     }
   }
 
@@ -121,11 +137,23 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> logout() async {
-    await ApiService.clearUserData();
+    print('🚪 Starting logout process...');
+    
+    try {
+      // Call API logout which handles both server logout and local data clearing
+      await ApiService.logout();
+    } catch (e) {
+      print('⚠️ Logout process had issues: $e');
+      // ApiService.logout() already handles clearing local data in finally block
+    }
+    
+    // Update provider state
     _user = null;
-    _showWelcomeAfterLogin = false; // Reset welcome flag on logout
-    _isLoggingIn = false; // Reset login flag on logout
+    _showWelcomeAfterLogin = false;
+    
+    print('🔄 Notifying listeners for UI update...');
     notifyListeners();
+    print('✅ Logout completed - should redirect to login screen');
   }
 
   Future<void> refreshUserData() async {

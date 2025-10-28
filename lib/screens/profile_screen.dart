@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 
@@ -46,8 +47,18 @@ class ProfileScreen extends StatelessWidget {
                   color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    HapticFeedback.lightImpact(); // Provide haptic feedback
+                    // Refresh user data from the auth provider
+                    await authProvider.refreshUserData();
+                  },
+                  color: const Color(0xFF4ADE80),
+                  backgroundColor: Colors.white,
+                  strokeWidth: 2.5,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
                       // Profile Section with Avatar and Info
@@ -142,10 +153,8 @@ class ProfileScreen extends StatelessWidget {
 
                           if (shouldLogout == true) {
                             await authProvider.logout();
-                            // Check if context is still valid
-                            if (context.mounted) {
-                              Navigator.of(context).pushReplacementNamed('/login');
-                            }
+                            // AuthWrapper will automatically navigate to login screen
+                            // when it detects user is no longer authenticated
                           }
                         },
                         style: ElevatedButton.styleFrom(
@@ -168,6 +177,7 @@ class ProfileScreen extends StatelessWidget {
                       const SizedBox(height: 20),
                     ],
                   ),
+                ),
                 ),
               ),
             ),

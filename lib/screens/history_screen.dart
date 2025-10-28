@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
@@ -83,6 +84,7 @@ class HistoryScreenState extends State<HistoryScreen> {
   List<CallHistoryItem> _callHistory = [];
   List<CallHistoryItem> _filteredHistory = [];
   bool _isLoading = true;
+  bool _isRefreshing = false; // Separate state for pull-to-refresh
   String? _errorMessage;
   String _activeFilter = 'all';
   String _searchQuery = '';
@@ -96,9 +98,23 @@ class HistoryScreenState extends State<HistoryScreen> {
   }
 
   Future<void> _loadCallHistory() async {
+    await _loadCallHistoryInternal(false);
+  }
+
+  Future<void> _refreshCallHistory() async {
+    HapticFeedback.lightImpact(); // Provide haptic feedback
+    await _loadCallHistoryInternal(true);
+  }
+
+  Future<void> _loadCallHistoryInternal(bool isRefresh) async {
     setState(() {
-      _isLoading = true;
-      _errorMessage = null;
+      if (isRefresh) {
+        _isRefreshing = true;
+        _errorMessage = null; // Clear errors on refresh
+      } else {
+        _isLoading = true;
+        _errorMessage = null;
+      }
     });
 
     try {
@@ -115,19 +131,28 @@ class HistoryScreenState extends State<HistoryScreen> {
       } 
     } catch (e) {
       final errorMessage = e.toString().replaceFirst('Exception: ', '');
+      final userFriendlyMessage = ApiService.getUserFriendlyErrorMessage(errorMessage);
+      
       _handleSessionError(errorMessage);
       
       if (mounted) {
-        Navigator.pushReplacementNamed(context, "/login");
         setState(() {
+          _errorMessage = userFriendlyMessage;
           _callHistory = [];
           _updateFilteredHistory();
           _updateStats();
         });
+        
+        // Only redirect to login for session errors
+        if (errorMessage.contains('Session expired') || 
+            errorMessage.contains('Session has been ended')) {
+          Navigator.pushReplacementNamed(context, "/login");
+        }
       }
     } finally {
       setState(() {
         _isLoading = false;
+        _isRefreshing = false;
       });
     }
   }
@@ -197,7 +222,7 @@ class HistoryScreenState extends State<HistoryScreen> {
   }
 
   Future<void> _onRefresh() async {
-    await _loadCallHistory();
+    await _refreshCallHistory();
   }
 
   void _showCallDetails(CallHistoryItem call) {
@@ -480,7 +505,7 @@ class HistoryScreenState extends State<HistoryScreen> {
                   color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: _isLoading
+                child: _isLoading && !_isRefreshing
                     ? const Center(
                         child: CircularProgressIndicator(
                           valueColor: AlwaysStoppedAnimation<Color>(
@@ -490,23 +515,44 @@ class HistoryScreenState extends State<HistoryScreen> {
                       )
                     : _errorMessage != null
                     ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              _errorMessage!,
-                              style: const TextStyle(color: Colors.white),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _loadCallHistory,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF4ADE80),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                ApiService.isNetworkError(_errorMessage!) 
+                                    ? Icons.wifi_off_rounded 
+                                    : Icons.error_outline_rounded,
+                                color: Colors.white.withValues(alpha: 0.7),
+                                size: 48,
                               ),
-                              child: const Text('Retry'),
-                            ),
-                          ],
+                              const SizedBox(height: 16),
+                              Text(
+                                _errorMessage!,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  height: 1.4,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 24),
+                              ElevatedButton.icon(
+                                onPressed: _loadCallHistory,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Retry'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF4ADE80),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24, 
+                                    vertical: 12
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       )
                     : _filteredHistory.isEmpty
@@ -542,6 +588,9 @@ class HistoryScreenState extends State<HistoryScreen> {
                       )
                     : RefreshIndicator(
                         onRefresh: _onRefresh,
+                        color: const Color(0xFF4ADE80),
+                        backgroundColor: Colors.white,
+                        strokeWidth: 2.5,
                         child: ListView.builder(
                           padding: const EdgeInsets.all(16),
                           itemCount: _filteredHistory.length,

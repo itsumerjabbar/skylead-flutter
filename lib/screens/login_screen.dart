@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
+import '../services/api_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -32,6 +35,8 @@ class LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    print('🚀 Login button pressed');
+    
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -39,20 +44,28 @@ class LoginScreenState extends State<LoginScreen> {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.login(_emailController.text, _passwordController.text);
-
-      if (!mounted) return;
-
-      // Reset loading - AuthWrapper will handle navigation
-      setState(() {
-        _isLoading = false;
-      });
+      print('📱 Calling authProvider.login...');
       
-      // AuthWrapper will automatically show welcome screen then main screen
-    } catch (e) {
+      await authProvider.login(_emailController.text, _passwordController.text);
+      
+      print('✅ Login completed successfully - AuthProvider should handle navigation');
+      
       if (!mounted) return;
+
+      // DON'T set state here - let AuthProvider handle everything
+      // The AuthWrapper will detect authentication and navigate automatically
+      
+    } catch (e) {
+      print('❌ Login error caught: $e');
+      
+      if (!mounted) return;
+      
+      // Use the new utility function for consistent error handling
+      String errorMessage = e.toString().replaceFirst('Exception: ', '');
+      String userFriendlyMessage = ApiService.getUserFriendlyErrorMessage(errorMessage);
+      
       setState(() {
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _errorMessage = userFriendlyMessage;
         _isLoading = false;
       });
     }
@@ -109,6 +122,7 @@ class LoginScreenState extends State<LoginScreen> {
                   TextField(
                     controller: _emailController,
                     style: const TextStyle(color: Colors.white),
+                    cursorColor: Colors.white,
                     decoration: InputDecoration(
                       hintText: 'john@gmail.com',
                       hintStyle: const TextStyle(color: Color(0xFFA0B4B1)),
@@ -146,6 +160,7 @@ class LoginScreenState extends State<LoginScreen> {
                   TextField(
                     controller: _passwordController,
                     style: const TextStyle(color: Colors.white),
+                    cursorColor: Colors.white,
                     decoration: InputDecoration(
                       hintText: '••••••••',
                       hintStyle: const TextStyle(color: Color(0xFFA0B4B1)),
