@@ -63,7 +63,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '134091866630',
     projectId: 'skylead-db6e9',
     storageBucket: 'skylead-db6e9.firebasestorage.app',
-    iosBundleId: 'com.sohaibraza789.skylead',
+    iosBundleId: 'me.skyos.crm',
   );
 
 }
