@@ -19,6 +19,7 @@ class CallHistoryItem {
   final String? leadName;
   final String? clientEmail;
   final String? callTime;
+  final String? type;
 
   CallHistoryItem({
     required this.id,
@@ -34,6 +35,7 @@ class CallHistoryItem {
     this.leadName,
     this.clientEmail,
     this.callTime,
+    this.type,
   });
 
   factory CallHistoryItem.fromJson(Map<String, dynamic> json) {
@@ -55,20 +57,23 @@ class CallHistoryItem {
       }
     }
 
+    final createdAt = json['created_at'] ?? json['time'] ?? '';
+
     return CallHistoryItem(
       id: json['id']?.toString() ?? '',
       name: clientName,
       phone: json['mobile'] ?? json['phone'] ?? '',
       status: json['call_status'] ?? json['status'] ?? 'accepted',
       duration: json['duration'] ?? '0:00',
-      time: json['created_at'] ?? json['time'] ?? '',
-      date: json['created_at'] ?? json['date'] ?? '',
+      time: createdAt,
+      date: createdAt,
       initials: initials,
-      leadId: json['lead_id']?.toString(),
+      leadId: json['lead_id']?.toString() ?? json['data_id']?.toString(),
       agentName: json['agent_name'],
       leadName: json['lead_name'],
       clientEmail: json['client_email'],
-      callTime: json['call_time'],
+      callTime: createdAt,
+      type: json['type'],
     );
   }
 }
@@ -324,7 +329,15 @@ class HistoryScreenState extends State<HistoryScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _buildDetailRow('Lead ID:', call.leadId ?? 'N/A'),
+                  if (call.type != null)
+                    _buildDetailRow(
+                      'Type:',
+                      call.type![0].toUpperCase() + call.type!.substring(1).toLowerCase(),
+                    ),
+                  _buildDetailRow(
+                    call.type == 'lead' ? 'Lead ID:' : 'Data ID:',
+                    call.leadId ?? 'N/A',
+                  ),
                   _buildDetailRow('Lead Name:', call.leadName ?? 'N/A'),
                   _buildDetailRow('Agent:', call.agentName ?? 'N/A'),
                   _buildDetailRow(
@@ -734,6 +747,27 @@ class HistoryScreenState extends State<HistoryScreen> {
             const SizedBox(height: 16),
             Row(
               children: [
+                if (call.type != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      call.type![0].toUpperCase() + call.type!.substring(1).toLowerCase(),
+                      style: const TextStyle(
+                        color: Color(0xFF16A34A),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                if (call.type != null && call.leadId != null)
+                  const SizedBox(width: 8),
                 if (call.leadId != null)
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -745,7 +779,7 @@ class HistoryScreenState extends State<HistoryScreen> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      'Lead ID: ${call.leadId}',
+                      call.type == 'lead' ? 'Lead ID: ${call.leadId}' : 'Data ID: ${call.leadId}',
                       style: const TextStyle(
                         color: Color(0xFF0369A1),
                         fontSize: 12,
@@ -786,14 +820,28 @@ class HistoryScreenState extends State<HistoryScreen> {
 
   String _formatCallTime(String timeString) {
     try {
-      // Handle "Today, 9:52 PM" format
-      if (timeString.contains('Today')) {
-        return timeString;
-      }
+      // Handle format like "2025-11-17 18:09:26" - extract just the time part
+      if (timeString.contains('-') && timeString.contains(' ')) {
+        try {
+          final parts = timeString.split(' ');
+          if (parts.length >= 2) {
+            final timePart = parts[1];
+            final timeComponents = timePart.split(':');
+            if (timeComponents.length >= 2) {
+              int hour = int.tryParse(timeComponents[0]) ?? 0;
+              int minute = int.tryParse(timeComponents[1]) ?? 0;
 
-      // Handle "Yesterday, 7:15 PM" format
-      if (timeString.contains('Yesterday')) {
-        return timeString;
+              // Convert to 12-hour format
+              String period = hour >= 12 ? 'PM' : 'AM';
+              hour = hour % 12;
+              if (hour == 0) hour = 12;
+
+              return '$hour:${minute.toString().padLeft(2, '0')} $period';
+            }
+          }
+        } catch (e) {
+          // If parsing fails, continue to next format
+        }
       }
 
       // Handle UTC format like "2025-09-17T20:55:37.0000000Z"

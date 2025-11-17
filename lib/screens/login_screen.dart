@@ -37,6 +37,9 @@ class LoginScreenState extends State<LoginScreen> {
 
     print('🚀 Login button pressed');
     
+    // Dismiss keyboard to prevent scroll issues
+    FocusScope.of(context).unfocus();
+    
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -52,7 +55,11 @@ class LoginScreenState extends State<LoginScreen> {
       
       if (!mounted) return;
 
-      // DON'T set state here - let AuthProvider handle everything
+      // Reset loading state after successful login
+      setState(() {
+        _isLoading = false;
+      });
+      
       // The AuthWrapper will detect authentication and navigate automatically
       
     } catch (e) {

@@ -21,8 +21,9 @@ class CallRequest {
   final String? leadId;
   final String? callId;
   final String? agentName;
-  final String? leadName;
+  final String? campaign;
   final String? clientEmail;
+  final String? leadType; // New field for lead/data type
 
   CallRequest({
     required this.id,
@@ -38,18 +39,19 @@ class CallRequest {
     this.leadId,
     this.callId,
     this.agentName,
-    this.leadName,
+    this.campaign,
     this.clientEmail,
+    this.leadType,
   });
 
   factory CallRequest.fromJson(Map<String, dynamic> json) {
-    final clientName = json['client_name'] ?? 'Unknown Caller';
+    final clientName = json['client_name'] ?? 'No Name';
     final mobile = json['mobile'] ?? '';
     final createdAt = json['created_at'] ?? '';
 
     // Safe initials generation
     String initials = 'UN';
-    if (clientName.isNotEmpty && clientName != 'Unknown Caller') {
+    if (clientName.isNotEmpty && clientName != 'No Name') {
       try {
         final nameParts = clientName.trim().split(' ');
         if (nameParts.length >= 2) {
@@ -64,8 +66,11 @@ class CallRequest {
       }
     }
 
+    // Get the ID directly from 'id' field
+    final idValue = json['id']?.toString() ?? '0';
+
     return CallRequest(
-      id: '${json['lead_id']}_${DateTime.now().millisecondsSinceEpoch}_${(DateTime.now().millisecondsSinceEpoch % 1000).toString().padLeft(3, '0')}',
+      id: '${idValue}_${DateTime.now().millisecondsSinceEpoch}_${(DateTime.now().millisecondsSinceEpoch % 1000).toString().padLeft(3, '0')}',
       name: clientName,
       phone: mobile,
       initials: initials,
@@ -75,11 +80,12 @@ class CallRequest {
       originalTime: createdAt, // Store original time
       status: json['call_status'] ?? 'pending',
       timestamp: DateTime.now().millisecondsSinceEpoch,
-      leadId: json['lead_id']?.toString(),
+      leadId: idValue,
       callId: json['call_id']?.toString(),
       agentName: json['agent_name'],
-      leadName: json['lead_name'],
+      campaign: json['campaign'],
       clientEmail: json['client_email'],
+      leadType: json['type'], // Get type from API
     );
   }
 
@@ -393,17 +399,22 @@ class DashboardScreenState extends State<DashboardScreen>
 
       final leadId = callRequest.leadId ?? callId.split('_')[0];
       final apiCallId = callRequest.callId ?? callId;
+      final leadType = callRequest.leadType; // Get type from call request
 
       // Prepare API status: 1 for accept, 0 for decline
       final apiStatus = action == 'accept' ? 1 : 0;
 
+      // Prepare the body with correct ID field based on type
+      final Map<String, dynamic> requestBody = {
+        'call_id': apiCallId,
+        'status': apiStatus,
+        'type': leadType,
+        'id': int.parse(leadId),
+      };
+
       await ApiService.post(
         '/accept-call-notification',
-        body: {
-          'lead_id': int.parse(leadId),
-          'call_id': apiCallId,
-          'status': apiStatus,
-        },
+        body: requestBody,
       );
 
       // Update local state
@@ -424,8 +435,9 @@ class DashboardScreenState extends State<DashboardScreen>
             leadId: _callRequests[index].leadId,
             callId: _callRequests[index].callId,
             agentName: _callRequests[index].agentName,
-            leadName: _callRequests[index].leadName,
+            campaign: _callRequests[index].campaign,
             clientEmail: _callRequests[index].clientEmail,
+            leadType: _callRequests[index].leadType,
           );
         }
       });
@@ -1055,6 +1067,27 @@ class DashboardScreenState extends State<DashboardScreen>
           const SizedBox(height: 16),
           Row(
             children: [
+              if (call.leadType != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    call.leadType![0].toUpperCase() + call.leadType!.substring(1).toLowerCase(),
+                    style: const TextStyle(
+                      color: Color(0xFF16A34A),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              if (call.leadType != null && call.leadId != null)
+                const SizedBox(width: 8),
               if (call.leadId != null)
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -1066,7 +1099,7 @@ class DashboardScreenState extends State<DashboardScreen>
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    'Lead ID: ${call.leadId}',
+                    call.leadType == 'lead' ? 'Lead ID: ${call.leadId}' : 'Data ID: ${call.leadId}',
                     style: const TextStyle(
                       color: Color(0xFF0369A1),
                       fontSize: 12,
